@@ -10,7 +10,7 @@
 (def fs-list
   (FXCollections/observableArrayList
     (let [list (ArrayList.)]
-      (doseq [f (map (fn [f] {:filename (.getPath f) :filesize (.length f)}) (list-dir "./test-dir"))] (.add list f))
+      (doseq [item (map (fn [file] {:filename (.getPath file) :filesize (.length file)}) (list-dir "test-dir"))] (.add list item))
       list)))
 
 (def table-view (fx/table-view
@@ -32,7 +32,7 @@
         txt (fx/text)
         view (fx/v-box {:prefWidth 800} txt btn table-view)]
 
-    (watch-dir #(put! watch-ch %) (clojure.java.io/file "/Users/jwin/ClojureProjects/fx-commander"))
+    (watch-dir #(put! watch-ch %) (clojure.java.io/file "test-dir"))
 
     (go
       (while true
@@ -42,10 +42,13 @@
 
     (go
       (while true
-        (let [fs-event (<! watch-ch)]
+        (let [fs-event (<! watch-ch)
+              file (:file fs-event)]
           (println fs-event)
-          (when-let [f (when (= (:action fs-event) :create) (:file fs-event))]
-            (fx/run<! (.add fs-list {:filename (.getPath f) :filesize (.length f)}))))))
+          (condp = (:action fs-event)
+            :create (fx/run<! (.add fs-list {:filename (.getPath file) :filesize (.length file)}))
+            :delete (println "todo: remove")
+            :modify (println "todo: modify")))))
 
     view))
 
