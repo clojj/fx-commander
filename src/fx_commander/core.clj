@@ -1,6 +1,7 @@
 (ns fx-commander.core
   (:import (java.util ArrayList)
-           (javafx.collections FXCollections))
+           (javafx.collections FXCollections)
+           (javafx.scene.control TableView))
   (:require [fx-clj.core :as fx])
   (:require [juxt.dirwatch :refer [watch-dir]])
   (:require [me.raynes.fs :refer [list-dir]])
@@ -19,7 +20,8 @@
                              (fx/table-column {:text               "Size"
                                                :cell-value-factory (fn [i] (fx/observable-property (.getValue i) :filesize))
                                                })]
-                   :items   fs-list}))
+                   :items              fs-list
+                   :columnResizePolicy TableView/UNCONSTRAINED_RESIZE_POLICY}))
 
 (defn create-view []
 
@@ -27,8 +29,8 @@
         watch-ch (chan)
         btn (fx/button :#my-btn {:on-action click-ch        ; You can bind a core.async channel directly to an event
                                  :text      "Copy Path"})
-        txt (fx/text "Initial text")
-        view (fx/v-box txt btn table-view)]
+        txt (fx/text)
+        view (fx/v-box {:prefWidth 800} txt btn table-view)]
 
     (watch-dir #(put! watch-ch %) (clojure.java.io/file "/Users/jwin/ClojureProjects/fx-commander"))
 
@@ -43,7 +45,7 @@
         (let [fs-event (<! watch-ch)]
           (println fs-event)
           (when-let [f (when (= (:action fs-event) :create) (:file fs-event))]
-            (.add fs-list {:filename (.getPath f) :filesize (.length f)})))))
+            (fx/run<! (.add fs-list {:filename (.getPath f) :filesize (.length f)}))))))
 
     view))
 
