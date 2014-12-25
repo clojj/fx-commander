@@ -1,7 +1,8 @@
 (ns fx-commander.core
   (:import (java.util ArrayList)
            (javafx.collections FXCollections)
-           (javafx.scene.control TableView))
+           (javafx.scene.control TableView)
+           (javafx.beans.value ChangeListener))
   (:require [fx-clj.core :as fx])
   (:require [juxt.dirwatch :refer [watch-dir]])
   (:require [me.raynes.fs :refer [list-dir]])
@@ -10,35 +11,42 @@
 (def fs-list
   (FXCollections/observableArrayList
     (let [list (ArrayList.)]
-      (doseq [item (map (fn [file] {:filename (.getPath file) :filesize (.length file)}) (list-dir "test-dir"))] (.add list item))
+      (doseq [item (list-dir "test-dir")]
+        (.add list item))
       list)))
 
 (def table-view (fx/table-view
                   {:columns [(fx/table-column {:text               "Filename"
-                                               :cell-value-factory (fn [i] (fx/observable-property (.getValue i) :filename))
+                                               :cell-value-factory (fn [i] (fx/observable-property (.getValue i) (fn [item] (.getName item))))
                                                })
                              (fx/table-column {:text               "Size"
-                                               :cell-value-factory (fn [i] (fx/observable-property (.getValue i) :filesize))
+                                               :cell-value-factory (fn [i] (fx/observable-property (.getValue i) (fn [item] (.length item))))
                                                })]
                    :items              fs-list
                    :columnResizePolicy TableView/UNCONSTRAINED_RESIZE_POLICY}))
 
+(def label-show-path (fx/label))
+
+(defn delete-handler [e]
+  (-> table-view .getSelectionModel .getSelectedItem .delete))
+
+(defn- bind-selection-listener! [vc]
+  (let [l (reify ChangeListener
+            (changed [_ prop ov nv]
+              (when nv
+                (fx/pset! label-show-path (.getCanonicalPath nv)))))]
+    (-> vc .getSelectionModel .selectedItemProperty (.addListener l))))
+
 (defn create-view []
 
-  (let [click-ch (chan)
-        watch-ch (chan)
-        btn (fx/button :#my-btn {:on-action click-ch        ; You can bind a core.async channel directly to an event
-                                 :text      "Copy Path"})
-        txt (fx/text)
-        view (fx/v-box {:prefWidth 800} txt btn table-view)]
+  (let [watch-ch (chan)
+        btn (fx/button :#my-btn {:on-action delete-handler
+                                 :text      "Delete"})
+        view (fx/v-box {:prefWidth 800} label-show-path btn table-view)]
+
+    (bind-selection-listener! table-view)
 
     (watch-dir #(put! watch-ch %) (clojure.java.io/file "test-dir"))
-
-    (go
-      (while true
-        (let [click-event (<! click-ch)
-              sel-item (-> (.getSelectionModel table-view) (.getSelectedItem))]
-          (fx/run<! (fx/pset! txt (:filename sel-item))))))
 
     (go
       (while true
