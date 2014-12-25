@@ -28,7 +28,11 @@
 (def label-show-path (fx/label))
 
 (defn delete-handler [e]
-  (-> table-view .getSelectionModel .getSelectedItem .delete))
+  (let [file (-> table-view .getSelectionModel .getSelectedItem)
+        i (-> table-view .getSelectionModel .getSelectedIndex)]
+    (when (.delete file)
+      (println "deleted " file)
+      (.remove fs-list i (inc i)))))
 
 (defn- bind-selection-listener! [vc]
   (let [l (reify ChangeListener
@@ -54,7 +58,7 @@
               file (:file fs-event)]
           (println fs-event)
           (condp = (:action fs-event)
-            :create (fx/run<! (.add fs-list {:filename (.getPath file) :filesize (.length file)}))
+            :create (fx/run<! (.add fs-list file))
             :delete (println "todo: remove")
             :modify (println "todo: modify")))))
 
